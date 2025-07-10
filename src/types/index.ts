@@ -13,6 +13,7 @@ export interface InterviewResponse {
 export interface InterviewData {
   userName: string;
   userEmail: string;
+  companyEmail: string;
   jobPosition: string;
   cvContent?: string;
   questions: InterviewQuestion[];

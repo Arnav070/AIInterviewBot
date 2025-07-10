@@ -26,7 +26,7 @@ export function ResultsPage({ interviewData, onRestart }: ResultsPageProps) {
   const handleEmailResults = () => {
     toast({
         title: "Results Sent!",
-        description: `Your interview results have been sent to ${interviewData.userEmail}.`,
+        description: `Interview results for ${interviewData.userName} have been sent to ${interviewData.companyEmail}.`,
         action: <CheckCircle className="text-green-500" />,
     })
   }
@@ -68,7 +68,7 @@ export function ResultsPage({ interviewData, onRestart }: ResultsPageProps) {
           </p>
         </CardContent>
         <CardFooter className="flex-col sm:flex-row justify-center gap-4">
-            <Button onClick={handleEmailResults}><Mail className="mr-2 h-4 w-4" /> Email My Results</Button>
+            <Button onClick={handleEmailResults}><Mail className="mr-2 h-4 w-4" /> Email Results to Company</Button>
             <Button onClick={onRestart} variant="outline"><RefreshCcw className="mr-2 h-4 w-4" /> Start Over</Button>
         </CardFooter>
       </Card>

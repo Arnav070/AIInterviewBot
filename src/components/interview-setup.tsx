@@ -5,38 +5,62 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Camera, Mic, Bot } from 'lucide-react';
+import { Camera, Mic, Bot, FileUp } from 'lucide-react';
 import type { InterviewData } from '@/types';
+import { useState } from 'react';
+
+const MAX_FILE_SIZE = 500000;
+const ACCEPTED_FILE_TYPES = ["application/pdf", "text/plain", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
 
 const setupSchema = z.object({
   userName: z.string().min(2, 'Name must be at least 2 characters.'),
   userEmail: z.string().email('Please enter a valid email address.'),
+  companyEmail: z.string().email('Please enter a valid company email address.'),
   jobPosition: z.string().min(3, 'Job position must be at least 3 characters.'),
-  cvContent: z.string().optional(),
+  cvFile: z.any()
+    .refine((file) => file?.size <= MAX_FILE_SIZE, `Max file size is 5MB.`)
+    .refine(
+      (file) => ACCEPTED_FILE_TYPES.includes(file?.type),
+      ".pdf, .doc, .docx and .txt files are accepted."
+    ).optional(),
 });
 
 type SetupFormValues = z.infer<typeof setupSchema>;
 
 interface InterviewSetupProps {
-  onSetupComplete: (data: Omit<InterviewData, 'questions' | 'responses'>) => void;
+  onSetupComplete: (data: Omit<InterviewData, 'questions' | 'responses' | 'interviewerAvatar'>) => void;
 }
 
 export function InterviewSetup({ onSetupComplete }: InterviewSetupProps) {
+  const [cvContent, setCvContent] = useState('');
+
   const form = useForm<SetupFormValues>({
     resolver: zodResolver(setupSchema),
     defaultValues: {
       userName: '',
       userEmail: '',
+      companyEmail: '',
       jobPosition: '',
-      cvContent: '',
     },
   });
+  
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target?.result;
+        setCvContent(text as string);
+      };
+      reader.readAsText(file);
+    }
+  };
 
   const onSubmit = (values: SetupFormValues) => {
-    onSetupComplete(values);
+    const { cvFile, ...rest } = values;
+    onSetupComplete({...rest, cvContent });
   };
 
   return (
@@ -69,7 +93,7 @@ export function InterviewSetup({ onSetupComplete }: InterviewSetupProps) {
                 name="userEmail"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address</FormLabel>
+                    <FormLabel>Your Email Address</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g. jane.doe@example.com" {...field} />
                     </FormControl>
@@ -78,31 +102,48 @@ export function InterviewSetup({ onSetupComplete }: InterviewSetupProps) {
                 )}
               />
             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="jobPosition"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Job Position</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. Senior Software Engineer" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="companyEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company Email</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. hr@company.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
             <FormField
               control={form.control}
-              name="jobPosition"
+              name="cvFile"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Job Position</FormLabel>
+                  <FormLabel>Upload CV (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. Senior Software Engineer" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="cvContent"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>CV / Resume Content (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Paste your CV here for more personalized questions."
-                      className="resize-y min-h-[120px]"
-                      {...field}
-                    />
+                    <div className="relative">
+                        <Input type="file" className="pl-10" accept=".pdf,.doc,.docx,.txt" onChange={(e) => {
+                            field.onChange(e.target.files?.[0]);
+                            handleFileChange(e);
+                        }} />
+                        <FileUp className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    </div>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
