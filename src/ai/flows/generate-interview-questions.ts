@@ -10,8 +10,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import {textToSpeech} from './text-to-speech';
-import type {InterviewQuestion} from '@/types';
 
 const GenerateInterviewQuestionsInputSchema = z.object({
   jobPosition: z.string().describe('The job position for which to generate interview questions.'),
@@ -21,14 +19,7 @@ const GenerateInterviewQuestionsInputSchema = z.object({
 export type GenerateInterviewQuestionsInput = z.infer<typeof GenerateInterviewQuestionsInputSchema>;
 
 const GenerateInterviewQuestionsOutputSchema = z.object({
-  questions: z
-    .array(
-      z.object({
-        text: z.string().describe('The interview question.'),
-        audio: z.string().describe('The base64 encoded audio data for the question.'),
-      })
-    )
-    .describe('An array of interview questions, each with text and audio data.'),
+  questions: z.array(z.string()).describe('An array of interview question texts.'),
 });
 
 export type GenerateInterviewQuestionsOutput = z.infer<typeof GenerateInterviewQuestionsOutputSchema>;
@@ -56,20 +47,8 @@ const generateInterviewQuestionsFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await generateInterviewQuestionsPrompt(input);
-    const questionTexts = output?.questions ?? [];
-
-    const questionsWithAudio = await Promise.all(
-      questionTexts.map(async text => {
-        const audioData = await textToSpeech(text);
-        return {
-          text,
-          audio: audioData.media,
-        };
-      })
-    );
-    
     return {
-        questions: questionsWithAudio
+      questions: output?.questions ?? [],
     };
   }
 );

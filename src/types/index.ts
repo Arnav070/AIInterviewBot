@@ -1,6 +1,6 @@
 export interface InterviewQuestion {
   text: string;
-  audio: string;
+  audio?: string;
 }
 
 export interface InterviewResponse {
