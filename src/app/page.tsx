@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { InterviewData, InterviewResponse } from '@/types';
 import { generateQuestionsAction } from './actions';
 import { Logo } from '@/components/icons';
@@ -14,6 +14,11 @@ export default function Home() {
   const [stage, setStage] = useState<InterviewStage>('setup');
   const [interviewData, setInterviewData] = useState<InterviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleSetupComplete = async (data: Omit<InterviewData, 'questions' | 'responses'>) => {
     setStage('loading');
@@ -58,10 +63,15 @@ export default function Home() {
           </div>
         );
       case 'interviewing':
-        if (interviewData) {
+        if (interviewData && isClient) {
           return <VideoInterview interviewData={interviewData} onInterviewComplete={handleInterviewComplete} />;
         }
-        return null;
+        return (
+          <div className="flex flex-col items-center gap-4">
+            <p className="text-lg">Preparing interview environment...</p>
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        );
       case 'results':
         if (interviewData) {
           return <ResultsPage interviewData={interviewData} onRestart={handleRestart} />;
