@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import Webcam from 'react-webcam';
 import { useSpeechRecognition } from '@/hooks/use-speech-recognition';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { analyzeResponseAction } from '@/app/actions';
-import { Mic, MicOff, Bot, Send, Loader2, AlertTriangle } from 'lucide-react';
+import { Mic, MicOff, Send, Loader2, AlertTriangle, Play } from 'lucide-react';
 import type { InterviewData, InterviewResponse } from '@/types';
 
 interface VideoInterviewProps {
@@ -15,16 +16,32 @@ interface VideoInterviewProps {
   onInterviewComplete: (responses: InterviewResponse[]) => void;
 }
 
-type InterviewStatus = 'waiting' | 'listening' | 'processing';
+type InterviewStatus = 'waiting' | 'listening' | 'processing' | 'playing';
 
 export function VideoInterview({ interviewData, onInterviewComplete }: VideoInterviewProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [status, setStatus] = useState<InterviewStatus>('waiting');
   const [responses, setResponses] = useState<InterviewResponse[]>([]);
   const { transcript, isListening, startListening, stopListening, resetTranscript, error: speechError } = useSpeechRecognition();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const currentQuestion = interviewData.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex) / interviewData.questions.length) * 100;
+  
+  const playQuestionAudio = () => {
+    if (audioRef.current) {
+      setStatus('playing');
+      audioRef.current.play();
+    }
+  };
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.onended = () => {
+        setStatus('waiting');
+      };
+    }
+  }, [currentQuestionIndex]);
   
   const handleStartRecording = () => {
     resetTranscript();
@@ -40,12 +57,12 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
     
     try {
       const analysis = await analyzeResponseAction({
-        question: currentQuestion,
+        question: currentQuestion.text,
         answer: finalTranscript,
       });
 
       const newResponse: InterviewResponse = {
-        question: currentQuestion,
+        question: currentQuestion.text,
         answer: finalTranscript,
         score: analysis.score,
         feedback: analysis.feedback,
@@ -63,11 +80,10 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
       }
     } catch (error) {
         console.error("Failed to analyze response:", error);
-        // For simplicity, we'll move on. A real app might offer a retry.
         if (currentQuestionIndex < interviewData.questions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
         } else {
-          onInterviewComplete(responses); // complete with what we have
+          onInterviewComplete(responses);
         }
         setStatus('waiting');
     }
@@ -89,29 +105,43 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
         </CardContent>
       </Card>
 
-      <div className="relative w-full aspect-video bg-secondary rounded-lg overflow-hidden shadow-md">
-        <Webcam
-          audio={false}
-          mirrored={true}
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute bottom-4 left-4 bg-black/50 text-white p-2 rounded-md text-sm">
-            {isListening ? 'Listening...' : 'Ready'}
+      <div className="grid md:grid-cols-2 gap-6">
+        <div className="relative w-full aspect-square bg-secondary rounded-lg overflow-hidden shadow-md">
+            <Image
+                src={interviewData.interviewerAvatar}
+                alt="AI Interviewer"
+                layout="fill"
+                objectFit="cover"
+                data-ai-hint="person interviewer"
+            />
+            <audio ref={audioRef} src={currentQuestion.audio} />
+            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                <Button
+                    size="icon"
+                    className="w-16 h-16 rounded-full"
+                    onClick={playQuestionAudio}
+                    disabled={status !== 'waiting'}
+                >
+                    <Play className="w-8 h-8"/>
+                </Button>
+            </div>
+            <div className="absolute bottom-2 left-2 bg-black/50 text-white p-2 rounded-md text-xs">
+                {currentQuestion.text}
+            </div>
+        </div>
+
+        <div className="relative w-full aspect-square bg-secondary rounded-lg overflow-hidden shadow-md">
+            <Webcam
+            audio={false}
+            mirrored={true}
+            className="w-full h-full object-cover"
+            />
+            <div className="absolute bottom-2 left-2 bg-black/50 text-white p-2 rounded-md text-xs">
+                {status === 'listening' ? 'Listening...' : status === 'processing' ? 'Processing...' : 'Ready to Answer'}
+            </div>
         </div>
       </div>
       
-      <Card className="shadow-lg">
-        <CardHeader className="flex flex-row items-center gap-4">
-            <div className="bg-primary/10 p-3 rounded-full">
-                <Bot className="w-6 h-6 text-primary" />
-            </div>
-            <CardTitle className="text-xl">Question:</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg text-foreground font-medium">{currentQuestion}</p>
-        </CardContent>
-      </Card>
-
       {transcript && status === 'listening' && (
         <Card className="bg-background/70 backdrop-blur-sm">
           <CardHeader><CardTitle className="text-lg">Your Answer:</CardTitle></CardHeader>
@@ -141,10 +171,10 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
             Stop & Submit Answer
           </Button>
         )}
-        {status === 'processing' && (
+        {(status === 'processing' || status === 'playing') && (
           <Button size="lg" disabled>
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            Analyzing...
+            {status === 'processing' ? 'Analyzing...' : 'Playing Question...'}
           </Button>
         )}
       </div>

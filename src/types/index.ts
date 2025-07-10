@@ -1,3 +1,8 @@
+export interface InterviewQuestion {
+  text: string;
+  audio: string;
+}
+
 export interface InterviewResponse {
   question: string;
   answer: string;
@@ -10,6 +15,7 @@ export interface InterviewData {
   userEmail: string;
   jobPosition: string;
   cvContent?: string;
-  questions: string[];
+  questions: InterviewQuestion[];
   responses: InterviewResponse[];
+  interviewerAvatar: string;
 }

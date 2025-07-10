@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { useToast } from "@/hooks/use-toast"
 import { Star, MessageSquareQuote, CheckCircle, Mail, RefreshCcw } from 'lucide-react';
 import type { InterviewData } from '@/types';
@@ -23,12 +22,6 @@ export function ResultsPage({ interviewData, onRestart }: ResultsPageProps) {
     const total = interviewData.responses.reduce((sum, res) => sum + res.score, 0);
     return Math.round(total / interviewData.responses.length);
   }, [interviewData.responses]);
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'bg-green-500';
-    if (score >= 60) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
   
   const handleEmailResults = () => {
     toast({

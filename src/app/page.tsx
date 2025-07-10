@@ -20,15 +20,15 @@ export default function Home() {
     setIsClient(true);
   }, []);
 
-  const handleSetupComplete = async (data: Omit<InterviewData, 'questions' | 'responses'>) => {
+  const handleSetupComplete = async (data: Omit<InterviewData, 'questions' | 'responses' | 'interviewerAvatar'>) => {
     setStage('loading');
     setError(null);
     try {
-      const questions = await generateQuestionsAction({
+      const { questions, interviewerAvatar } = await generateQuestionsAction({
         jobPosition: data.jobPosition,
         cvContent: data.cvContent || '',
       });
-      setInterviewData({ ...data, questions, responses: [] });
+      setInterviewData({ ...data, questions, responses: [], interviewerAvatar });
       setStage('interviewing');
     } catch (e) {
       console.error(e);
