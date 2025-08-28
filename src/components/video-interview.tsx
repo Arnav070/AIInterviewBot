@@ -28,16 +28,29 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
   
   const currentQuestion = questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex) / questions.length) * 100;
+
+  const handleStartRecording = useCallback(() => {
+    resetTranscript();
+    startListening();
+    setStatus('listening');
+  }, [resetTranscript, startListening]);
   
   const playQuestionAudio = useCallback(async () => {
-    if (status !== 'waiting') return;
+    if (!currentQuestion) return;
+
+    const playAudio = (audioData: string) => {
+        if (audioRef.current) {
+            audioRef.current.src = audioData;
+            setStatus('playing');
+            audioRef.current.play().catch(e => {
+                console.error("Audio play failed:", e);
+                setStatus('waiting');
+            });
+        }
+    };
 
     if (currentQuestion.audio) {
-      if (audioRef.current) {
-        audioRef.current.src = currentQuestion.audio;
-        setStatus('playing');
-        audioRef.current.play();
-      }
+      playAudio(currentQuestion.audio);
     } else {
       setStatus('fetching_audio');
       try {
@@ -45,33 +58,36 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
         const updatedQuestions = [...questions];
         updatedQuestions[currentQuestionIndex].audio = audioData;
         setQuestions(updatedQuestions);
-        
-        if (audioRef.current) {
-            audioRef.current.src = audioData;
-            setStatus('playing');
-            audioRef.current.play();
-        }
+        playAudio(audioData);
       } catch (error) {
           console.error("Failed to fetch audio:", error);
-          setStatus('waiting');
+          // If fetching fails, we should still proceed to listening
+          handleStartRecording();
       }
     }
-  }, [currentQuestion, questions, currentQuestionIndex, status]);
+  }, [currentQuestion, questions, currentQuestionIndex, textToSpeechAction, handleStartRecording]);
 
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.onended = () => {
-        setStatus('waiting');
+      const audio = audioRef.current;
+      const onAudioEnd = () => {
+        handleStartRecording();
+      };
+      audio.addEventListener('ended', onAudioEnd);
+      return () => {
+        audio.removeEventListener('ended', onAudioEnd);
       };
     }
-  }, []);
-  
-  const handleStartRecording = () => {
-    resetTranscript();
-    startListening();
-    setStatus('listening');
-  };
+  }, [handleStartRecording]);
 
+  useEffect(() => {
+    // Automatically play the question when the component is ready for it.
+    if (status === 'waiting') {
+        playQuestionAudio();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, currentQuestionIndex]); // Rerun when question changes or status becomes 'waiting'
+  
   const handleStopRecording = async () => {
     stopListening();
     setStatus('processing');
@@ -103,12 +119,21 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
       }
     } catch (error) {
         console.error("Failed to analyze response:", error);
+        // Still proceed to next question or finish interview on error
+        const updatedResponses = [...responses, {
+            question: currentQuestion.text,
+            answer: finalTranscript,
+            score: 0,
+            feedback: 'Could not analyze response.',
+        }];
+        setResponses(updatedResponses);
+
         if (currentQuestionIndex < interviewData.questions.length - 1) {
           setCurrentQuestionIndex(currentQuestionIndex + 1);
+           setStatus('waiting');
         } else {
-          onInterviewComplete(responses);
+          onInterviewComplete(updatedResponses);
         }
-        setStatus('waiting');
     }
   };
 
@@ -138,16 +163,20 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
                 data-ai-hint="person interviewer"
             />
             <audio ref={audioRef} />
-            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                <Button
-                    size="icon"
-                    className="w-16 h-16 rounded-full"
-                    onClick={playQuestionAudio}
-                    disabled={status !== 'waiting'}
-                >
-                    {status === 'fetching_audio' ? <Loader2 className="w-8 h-8 animate-spin"/> : <Play className="w-8 h-8"/>}
-                </Button>
-            </div>
+            {(status === 'playing' || status === 'fetching_audio') && (
+                <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                    <div className="flex items-center gap-3 text-white bg-black/50 p-3 rounded-lg">
+                        {status === 'fetching_audio' ? (
+                            <Loader2 className="w-6 h-6 animate-spin"/>
+                        ) : (
+                            <div className="w-2 h-6 bg-white animate-[pulse_1.5s_ease-out_infinite] [animation-delay:-0.3s]"></div>
+                        )}
+                        <span className="font-medium">
+                            {status === 'fetching_audio' ? 'Loading question...' : 'Asking question...'}
+                        </span>
+                    </div>
+                </div>
+            )}
             <div className="absolute bottom-2 left-2 bg-black/50 text-white p-2 rounded-md text-xs">
                 {currentQuestion.text}
             </div>
@@ -160,12 +189,14 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
             className="w-full h-full object-cover"
             />
             <div className="absolute bottom-2 left-2 bg-black/50 text-white p-2 rounded-md text-xs">
-                {status === 'listening' ? 'Listening...' : status === 'processing' ? 'Processing...' : 'Ready to Answer'}
+                {status === 'listening' && <span className="flex items-center gap-2"><Mic className="text-red-500 animate-pulse" /> Listening...</span>}
+                {status === 'processing' && <span>Processing...</span>}
+                {status !== 'listening' && status !== 'processing' && <span>Ready to Answer</span>}
             </div>
         </div>
       </div>
       
-      {transcript && status === 'listening' && (
+      {transcript && (status === 'listening' || status === 'processing') && (
         <Card className="bg-background/70 backdrop-blur-sm">
           <CardHeader><CardTitle className="text-lg">Your Answer:</CardTitle></CardHeader>
           <CardContent>
@@ -182,22 +213,16 @@ export function VideoInterview({ interviewData, onInterviewComplete }: VideoInte
       )}
       
       <div className="flex justify-center mt-4">
-        {status === 'waiting' && (
-          <Button size="lg" onClick={handleStartRecording} disabled={!!speechError}>
-            <Mic className="mr-2 h-5 w-5" />
-            Start Answering
-          </Button>
-        )}
         {status === 'listening' && (
           <Button size="lg" onClick={handleStopRecording} variant="destructive">
             <MicOff className="mr-2 h-5 w-5" />
             Stop & Submit Answer
           </Button>
         )}
-        {(status === 'processing' || status === 'playing' || status === 'fetching_audio') && (
+        {status === 'processing' && (
           <Button size="lg" disabled>
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            {status === 'processing' ? 'Analyzing...' : (status === 'playing' ? 'Playing Question...' : 'Getting Audio...')}
+            Analyzing...
           </Button>
         )}
       </div>
