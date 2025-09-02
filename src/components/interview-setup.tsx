@@ -20,9 +20,9 @@ const setupSchema = z.object({
   companyEmail: z.string().email('Please enter a valid company email address.'),
   jobPosition: z.string().min(3, 'Job position must be at least 3 characters.'),
   cvFile: z.any()
-    .refine((file) => file?.size <= MAX_FILE_SIZE, `Max file size is 5MB.`)
+    .refine((file) => !file || file.size <= MAX_FILE_SIZE, `Max file size is 5MB.`)
     .refine(
-      (file) => ACCEPTED_FILE_TYPES.includes(file?.type),
+      (file) => !file || ACCEPTED_FILE_TYPES.includes(file.type),
       ".pdf, .doc, .docx and .txt files are accepted."
     ).optional(),
 });
@@ -31,9 +31,10 @@ type SetupFormValues = z.infer<typeof setupSchema>;
 
 interface InterviewSetupProps {
   onSetupComplete: (data: Omit<InterviewData, 'questions' | 'responses' | 'interviewerAvatar'>) => void;
+  disabled?: boolean;
 }
 
-export function InterviewSetup({ onSetupComplete }: InterviewSetupProps) {
+export function InterviewSetup({ onSetupComplete, disabled = false }: InterviewSetupProps) {
   const [cvContent, setCvContent] = useState('');
 
   const form = useForm<SetupFormValues>({
@@ -72,107 +73,109 @@ export function InterviewSetup({ onSetupComplete }: InterviewSetupProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="userName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. Jane Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="userEmail"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Your Email Address</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g. jane.doe@example.com" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <fieldset disabled={disabled} className="space-y-6">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="userName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. Jane Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="userEmail"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Your Email Address</FormLabel>
+                        <FormControl>
+                          <Input placeholder="e.g. jane.doe@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="jobPosition"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Job Position</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. Senior Software Engineer" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                     <FormField
+                      control={form.control}
+                      name="companyEmail"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Company Email</FormLabel>
+                          <FormControl>
+                            <Input placeholder="e.g. hr@company.com" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
                 <FormField
                   control={form.control}
-                  name="jobPosition"
+                  name="cvFile"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Job Position</FormLabel>
+                      <FormLabel>Upload CV (Optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. Senior Software Engineer" {...field} />
+                        <div className="relative">
+                            <Input type="file" className="pl-10" accept=".pdf,.doc,.docx,.txt" onChange={(e) => {
+                                field.onChange(e.target.files?.[0]);
+                                handleFileChange(e);
+                            }} />
+                            <FileUp className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        </div>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                 <FormField
-                  control={form.control}
-                  name="companyEmail"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Company Email</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. hr@company.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-            </div>
-            <FormField
-              control={form.control}
-              name="cvFile"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Upload CV (Optional)</FormLabel>
-                  <FormControl>
-                    <div className="relative">
-                        <Input type="file" className="pl-10" accept=".pdf,.doc,.docx,.txt" onChange={(e) => {
-                            field.onChange(e.target.files?.[0]);
-                            handleFileChange(e);
-                        }} />
-                        <FileUp className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <div className="pt-4 space-y-4">
-                <h3 className="font-medium text-lg">Instructions</h3>
-                <ul className="space-y-3 text-muted-foreground">
-                    <li className="flex items-start gap-3">
-                        <Camera className="w-5 h-5 mt-1 text-primary shrink-0" />
-                        <span>Ensure your camera and microphone are enabled and working correctly.</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                        <Bot className="w-5 h-5 mt-1 text-primary shrink-0" />
-                        <span>The AI will ask you a series of questions. Speak your answer clearly.</span>
-                    </li>
-                    <li className="flex items-start gap-3">
-                        <Mic className="w-5 h-5 mt-1 text-primary shrink-0" />
-                        <span>Click 'Start Answering' to begin recording your response and 'Stop' when you're finished.</span>
-                    </li>
-                </ul>
-            </div>
+                
+                <div className="pt-4 space-y-4">
+                    <h3 className="font-medium text-lg">Instructions</h3>
+                    <ul className="space-y-3 text-muted-foreground">
+                        <li className="flex items-start gap-3">
+                            <Camera className="w-5 h-5 mt-1 text-primary shrink-0" />
+                            <span>Ensure your camera and microphone are enabled and working correctly.</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <Bot className="w-5 h-5 mt-1 text-primary shrink-0" />
+                            <span>The AI will ask you a series of questions. Speak your answer clearly.</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                            <Mic className="w-5 h-5 mt-1 text-primary shrink-0" />
+                            <span>The recording will start automatically after each question. Click 'Stop' when you're finished.</span>
+                        </li>
+                    </ul>
+                </div>
 
-            <Button type="submit" className="w-full text-lg" size="lg">
-              Start Interview
-            </Button>
-          </form>
-        </Form>
+                <Button type="submit" className="w-full text-lg" size="lg">
+                  Start Interview
+                </Button>
+              </form>
+            </Form>
+        </fieldset>
       </CardContent>
     </Card>
   );

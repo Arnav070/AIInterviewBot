@@ -7,6 +7,8 @@ import { Logo } from '@/components/icons';
 import { InterviewSetup } from '@/components/interview-setup';
 import { VideoInterview } from '@/components/video-interview';
 import { ResultsPage } from '@/components/results-page';
+import { AlertTriangle, Info } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 type InterviewStage = 'setup' | 'interviewing' | 'results' | 'loading' | 'error';
 
@@ -15,9 +17,16 @@ export default function Home() {
   const [interviewData, setInterviewData] = useState<InterviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [isApiKeyMissing, setIsApiKeyMissing] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+    // This check is a proxy to see if the env var is set on the server.
+    // The actual key value is not exposed to the client.
+    fetch('/api/check-key').then(async (res) => {
+       const { hasKey } = await res.json();
+       setIsApiKeyMissing(!hasKey);
+    });
   }, []);
 
   const handleSetupComplete = async (data: Omit<InterviewData, 'questions' | 'responses' | 'interviewerAvatar'>) => {
@@ -49,11 +58,25 @@ export default function Home() {
     setStage('setup');
     setError(null);
   };
+  
+  const renderApiKeyWarning = () => {
+    if (!isApiKeyMissing) return null;
+
+    return (
+        <Alert variant="destructive" className="mb-8">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Configuration Error</AlertTitle>
+            <AlertDescription>
+                The `GEMINI_API_KEY` environment variable is not set. Please create a `.env` file in the root of your project and add your API key. You can get a key from Google AI Studio.
+            </AlertDescription>
+        </Alert>
+    );
+  }
 
   const renderStage = () => {
     switch (stage) {
       case 'setup':
-        return <InterviewSetup onSetupComplete={handleSetupComplete} />;
+        return <InterviewSetup onSetupComplete={handleSetupComplete} disabled={isApiKeyMissing} />;
       case 'loading':
         return (
           <div className="flex flex-col items-center gap-4">
@@ -102,6 +125,7 @@ export default function Home() {
           <Logo className="h-10 w-10 text-primary" />
           <h1 className="text-4xl font-bold tracking-tight text-foreground">Verbalize AI</h1>
         </header>
+        {renderApiKeyWarning()}
         <div className="w-full">{renderStage()}</div>
       </div>
     </main>
